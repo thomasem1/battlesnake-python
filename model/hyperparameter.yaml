@@ -1,0 +1,8 @@
+value_loss_coef: 0.5
+entropy_coef: 0.01
+max_grad_norm: 0.5
+clip_param: 0.2
+ppo_epoch: 4
+num_mini_batch: 32
+eps: 0.00001
+lr: 0.001
