@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from gym_battlesnake.gymbattlesnake import BattlesnakeEnv
 from a2c_ppo_acktr.algo import PPO
 from a2c_ppo_acktr.storage import RolloutStorage
+from sklearn.base import BaseEstimator
 
 from tqdm.notebook import tqdm
 from utils import PredictionPolicy, SnakePolicyBase
@@ -35,8 +36,12 @@ class RLAgent:
         
         self.lengths = None
         self.rewards = None
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.agent = None
+
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')        
+        self.reset_env()
     
+    def reset_env(self):
         self.env = BattlesnakeEnv(n_threads=1, n_envs=self.n_envs)
         self.rollouts = RolloutStorage(self.n_steps,
                                     self.n_envs,
@@ -48,9 +53,7 @@ class RLAgent:
         self.policy = create_policy(self.env.observation_space.shape, self.env.action_space, SnakePolicyBase)
         self.best_old_policy = create_policy(self.env.observation_space.shape, self.env.action_space, SnakePolicyBase)
         
-        self.agent = None
-
-        self.env = BattlesnakeEnv(n_threads=2, n_envs=self.n_envs, opponents=[self.policy for _ in range(3)], device=self.device)
+        self.env = BattlesnakeEnv(n_threads=2, n_envs=self.n_envs, opponents=[self.policy for _ in range(2)], device=self.device, teammates=[self.policy])
         obs = self.env.reset()
         self.rollouts.obs[0].copy_(torch.tensor(obs))
 
@@ -74,13 +77,11 @@ class RLAgent:
                         eps=self.eps,
                         lr=self.lr
                         )
-    
-
 
     # Let's define a method to check our performance against an older policy
     # Determines an unbiased winrate check
-    def check_performance(self, n_opponents=3, n_envs=1000, steps=1500):
-        test_env = BattlesnakeEnv(n_threads=os.cpu_count(), n_envs=n_envs, opponents=[self.best_old_policy for _ in range(n_opponents)], device=self.device)
+    def check_performance(self, n_opponents=2, n_envs=1000, steps=1500):
+        test_env = BattlesnakeEnv(n_threads=os.cpu_count(), n_envs=n_envs, opponents=[self.best_old_policy for _ in range(n_opponents)], device=self.device, teammates=[self.policy])
         obs = test_env.reset()
         wins = 0
         losses = 0
@@ -226,3 +227,29 @@ class RLAgent:
 
     def save_policy(self, path="policy.pth"):
         torch.save(self.policy.state_dict(), path)
+
+class RLEstimator(BaseEstimator):
+    def __init__(self, value_loss_coef=0.1, entropy_coef=0.001, max_grad_norm=0.1, clip_param=0.1,
+                 ppo_epoch=3, num_mini_batch=16, eps=1e-6, lr=0.0001):
+        self.value_loss_coef = value_loss_coef
+        self.entropy_coef = entropy_coef
+        self.max_grad_norm = max_grad_norm
+        self.clip_param = clip_param
+        self.ppo_epoch = ppo_epoch
+        self.num_mini_batch = num_mini_batch
+        self.eps = eps
+        self.lr = lr
+        self.rl_agent = RLAgent(1, 400, 50)
+
+    def fit(self, X, y=None):
+        self.rl_agent.reset_env()
+        self.rl_agent.set_agent(self.value_loss_coef, self.entropy_coef, self.max_grad_norm,
+                                self.clip_param, self.ppo_epoch, self.num_mini_batch,
+                                self.eps, self.lr)
+        self.rl_agent.train()
+        return self
+
+    def score(self, X, y=None):
+        # Evaluate the agent and return the negative of the episode length
+        # (since GridSearchCV tries to maximize the score)
+        return self.rl_agent.get_episode_length()
