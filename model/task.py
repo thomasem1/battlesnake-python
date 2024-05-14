@@ -18,6 +18,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    model.train_model(args.n_envs, args.n_steps, args.num_updates, args.value_loss_coef, args.entropy_coef, args.max_grad_norm,
-                args.clip_param, args.ppo_epoch, args.num_mini_batch, args.eps, args.lr)
+    rl_agent = model.RLAgent(args.n_envs, args.n_steps, args.num_updates)
+    rl_agent.set_agent(args.value_loss_coef, args.entropy_coef, args.max_grad_norm, args.clip_param, args.ppo_epoch, args.num_mini_batch, args.eps, args.lr)
+    rl_agent.train()
+    rl_agent.save_policy("my_policy.pth")
 

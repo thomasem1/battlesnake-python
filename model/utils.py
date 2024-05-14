@@ -64,7 +64,7 @@ class PredictionPolicy(Policy):
     def predict(self, inputs, deterministic=False, device=torch.device('cpu')):
         # Since this called from our gym environment
         # (and passed as a numpy array), we need to convert it to a tensor
-        inputs = torch.tensor(inputs, dtype=torch.float32).to(device)
+        inputs = inputs.clone().detach().to(device)
         value, actor_features, rnn_hxs = self.base(inputs, None, None)
         dist = self.dist(actor_features)
 
