@@ -10,7 +10,6 @@ from a2c_ppo_acktr.algo import PPO
 from a2c_ppo_acktr.storage import RolloutStorage
 from sklearn.base import BaseEstimator
 
-from tqdm.notebook import tqdm
 from utils import PredictionPolicy, SnakePolicyBase
 
 def create_policy(obs_space, act_space, base):
@@ -91,7 +90,7 @@ class RLAgent:
         with torch.no_grad():
             # Simulate to a maximum steps across our environments, only recording the first result in each env.
             print("Running performance check")
-            for step in tqdm(range(steps)):
+            for step in range(steps):
                 if count == n_envs:
                     # Quick break
                     print("Check Performance done @ step", step)
@@ -141,7 +140,7 @@ class RLAgent:
             # Set
             self.policy.eval()
             print(f"Iteration {j+1}: Generating rollouts")
-            for step in tqdm(range(self.n_steps)):
+            for step in range(self.n_steps):
                 with torch.no_grad():
                     value, action, action_log_prob, recurrent_hidden_states = self.policy.act(self.rollouts.obs[step],
                                                                     self.rollouts.recurrent_hidden_states[step],

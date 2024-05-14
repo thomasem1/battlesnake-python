@@ -19,7 +19,7 @@ def run():
     }
 
     hyperparameters = {
-        'value_loss_coef': [0.1, 0.25, 0.5, 1.0],
+        'value_loss_coef': [0.1],
         'entropy_coef': [0.1],
         'max_grad_norm': [1.0],
         'clip_param': [0.3],

@@ -17,10 +17,9 @@ class SnakePolicyBase(NNBase):
     def __init__(self, num_inputs, recurrent=False, hidden_size=128): 
         super().__init__(recurrent, hidden_size, hidden_size)
         
-        # We'll define a 3-stack CNN with leaky_relu activations and a batchnorm
-        # here.
+        # We'll define a 3-stack CNN with leaky_relu activations and a batchnorm here.
         self.base = nn.Sequential(
-            nn.Conv2d(17, 32, 3),
+            nn.Conv2d(18, 32, 3),
             nn.LeakyReLU(),
             nn.Conv2d(32, 32, 3),
             nn.LeakyReLU(),
@@ -28,12 +27,10 @@ class SnakePolicyBase(NNBase):
             nn.LeakyReLU(),
         )
         
-        # Try yourself: Try different pooling methods
         # We add a pooling layer since it massively speeds up training
         # and reduces the number of parameters to learn.
         self.pooling = nn.AdaptiveMaxPool2d(2)
         
-        # Try yourself: Change the number of features
         # 64 channels * 4x4 pooling outputs = 1024
         self.fc1 = nn.Linear(in_features=32*2*2, out_features=128)
         
