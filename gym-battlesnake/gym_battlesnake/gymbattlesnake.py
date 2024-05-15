@@ -31,7 +31,7 @@ env_obsptr = wrap_function(gamelib, 'env_getobspointer', ctypes.POINTER(ctypes.c
 env_actptr = wrap_function(gamelib, 'env_getactpointer', ctypes.POINTER(ctypes.c_ubyte), [ctypes.c_void_p,ctypes.c_uint])
 env_infoptr = wrap_function(gamelib, 'env_getinfopointer', ctypes.POINTER(info), [ctypes.c_void_p])
 
-NUM_LAYERS = 17
+NUM_LAYERS = 18
 LAYER_WIDTH = 23
 LAYER_HEIGHT = 23
 
@@ -41,7 +41,7 @@ class ParallelBattlesnakeEnv(VecEnv):
     def __init__(self, n_threads=4, n_envs=16, n_opponents=7, opponent=None, device=torch.device('cpu'), fixed_orientation=False, use_symmetry=False, dtype=torch.float32):
         # Define action and observation space
         self.action_space = spaces.Discrete(4)
-        self.observation_space = spaces.Box(low=0, high=255, shape=(NUM_LAYERS, LAYER_WIDTH, LAYER_HEIGHT), dtype=np.uint8)
+        self.observation_space = spaces.Box(low=0,high=255, shape=(NUM_LAYERS, LAYER_WIDTH, LAYER_HEIGHT), dtype=np.uint8)
         self.n_opponents = n_opponents
         self.opponent = opponent
         self.n_threads = n_threads
@@ -51,7 +51,7 @@ class ParallelBattlesnakeEnv(VecEnv):
         self.use_symmetry = use_symmetry
         if use_symmetry and not fixed_orientation:
             raise ValueError("symmetry must be used with fixed orientation")
-        self.ptr = env_new(self.n_threads, self.n_envs, self.n_opponents + 1, self.fixed_orientation, self.use_symmetry)
+        self.ptr = env_new(self.n_threads, self.n_envs, self.n_opponents+1, self.fixed_orientation, self.use_symmetry)
         self.dtype = dtype
         super(ParallelBattlesnakeEnv, self).__init__(self.n_envs, self.observation_space, self.action_space)
         self.reset()
@@ -61,32 +61,35 @@ class ParallelBattlesnakeEnv(VecEnv):
 
     def step_async(self, actions):
         # Write player actions into buffer
-        np.copyto(self.getact(0), np.asarray(actions, dtype=np.uint8))
+        np.copyto(self.getact(0), np.asarray(actions,dtype=np.uint8))
         # Get observations for each opponent and predict actions
         all_obs = []
         for i in range(self.n_opponents):
-            all_obs.append(self.getobs(i + 1))
+            all_obs.append(self.getobs(i+1))
         obs = np.vstack(all_obs)
         obs = torch.tensor(obs, dtype=self.dtype).to(self.device)
         with torch.no_grad():
-            acts, _ = self.opponent.predict(obs, deterministic=True)
-        acts = acts.view(self.n_opponents, self.n_envs).cpu().numpy().astype(np.uint8)
+            acts,_ = self.opponent.predict(obs, deterministic=True)
+        acts = acts.view(self.n_opponents, self.n_envs).cpu().detach().numpy().astype(np.uint8)
         for i in range(self.n_opponents):
-            np.copyto(self.getact(i + 1), acts[i].flatten())
+            np.copyto(self.getact(i+1), acts[i].flatten())
+            
         # Step game
         env_step(self.ptr)
 
     def step_wait(self):
+
         info = [{} for _ in range(self.n_envs)]
-        dones = np.asarray([False for _ in range(self.n_envs)])
+        dones = np.asarray([ False for _ in range(self.n_envs) ])
         rews = np.zeros((self.n_envs))
 
         infoptr = env_infoptr(self.ptr)
         for i in range(self.n_envs):
+            print("Teammate alive:", infoptr[i].teammate_alive)
             if infoptr[i].over:
                 dones[i] = True
                 info[i]['episode'] = {}
-                if infoptr[i].alive:
+                if infoptr[i].alive or infoptr[i].teammate_alive:
                     rews[i] += 1.0
                     info[i]['episode']['r'] = rews[i]
                 else:
@@ -99,6 +102,7 @@ class ParallelBattlesnakeEnv(VecEnv):
     def reset(self):
         env_reset(self.ptr)
         return self.getobs(0)
+
 
     def getobs(self, agent_i):
         obsptr = env_obsptr(self.ptr, agent_i)
@@ -114,21 +118,26 @@ class ParallelBattlesnakeEnv(VecEnv):
     def set_attr(self, attr_name, value, indices=None):
         pass
 
-    def env_method(self, method_name, *method_args, indices=None, **method_kwargs):
+    def env_method(self,
+                   method_name,
+                   *method_args,
+                   indices=None,
+                   **method_kwargs):
         pass
 
     def seed(self, seed=None):
         pass
 
-
 class BattlesnakeEnv(VecEnv):
     """Multi-Threaded Multi-Agent Snake Environment"""
-    def __init__(self, n_threads=4, n_envs=16, opponents=[], device=torch.device('cpu'), fixed_orientation=False, use_symmetry=False):
+    def __init__(self, n_threads=4, n_envs=16, opponents=[], device=torch.device('cpu'), fixed_orientation=False, use_symmetry=False, teammates=[]):
         # Define action and observation space
         self.action_space = spaces.Discrete(4)
         self.observation_space = spaces.Box(low=0,high=255, shape=(NUM_LAYERS, LAYER_WIDTH, LAYER_HEIGHT), dtype=np.uint8)
         self.n_opponents = len(opponents)
+        self.n_teammates = len(teammates)
         self.opponents = opponents
+        self.teammates = teammates
         self.n_threads = n_threads
         self.n_envs = n_envs
         self.device = device
@@ -136,7 +145,7 @@ class BattlesnakeEnv(VecEnv):
         self.use_symmetry = use_symmetry
         if use_symmetry and not fixed_orientation:
             raise ValueError("symmetry must be used with fixed orientation")
-        self.ptr = env_new(self.n_threads, self.n_envs, self.n_opponents+1, self.fixed_orientation, self.use_symmetry)
+        self.ptr = env_new(self.n_threads, self.n_envs, self.n_opponents + self.n_teammates + 1, self.fixed_orientation, self.use_symmetry)
         super(BattlesnakeEnv, self).__init__(self.n_envs, self.observation_space, self.action_space)
         self.reset()
 
@@ -145,19 +154,26 @@ class BattlesnakeEnv(VecEnv):
 
     def step_async(self, actions):
         # Write player actions into buffer
-        np.copyto(self.getact(0), np.asarray(actions, dtype=np.uint8))
-        # Get observations for each opponent and predict actions
+        np.copyto(self.getact(0), np.asarray(actions,dtype=np.uint8))
+        # Get observations for each opponent and teammate and predict actions
         with torch.no_grad():
-            for i in range(1, self.n_opponents + 1):
+            # Teammates
+            for j in range(1, self.n_teammates + 1):
+                obss = torch.tensor(self.getobs(j), dtype=torch.float32).to(self.device)
+                acts, _ = self.teammates[j-1].predict(obss, deterministic=True)
+                np.copyto(self.getact(j), acts.detach().cpu().numpy().flatten().astype(np.uint8))
+            # Opponents
+            for i in range(self.n_teammates + 1, self.n_teammates + self.n_opponents+1):
                 obss = torch.tensor(self.getobs(i), dtype=torch.float32).to(self.device)
-                acts, _ = self.opponents[i - 1].predict(obss, deterministic=True)
-                np.copyto(self.getact(i), acts.cpu().numpy().flatten().astype(np.uint8))
+                acts,_ = self.opponents[i- self.n_teammates - 1].predict(obss, deterministic=True)
+                np.copyto(self.getact(i), acts.detach().cpu().numpy().flatten().astype(np.uint8))
         # Step game
         env_step(self.ptr)
 
     def step_wait(self):
+
         info = [{} for _ in range(self.n_envs)]
-        dones = np.asarray([False for _ in range(self.n_envs)])
+        dones = np.asarray([ False for _ in range(self.n_envs) ])
         rews = np.zeros((self.n_envs))
 
         infoptr = env_infoptr(self.ptr)
@@ -165,7 +181,7 @@ class BattlesnakeEnv(VecEnv):
             if infoptr[i].over:
                 dones[i] = True
                 info[i]['episode'] = {}
-                if infoptr[i].alive:
+                if infoptr[i].alive:# or infoptr[i].teammate_alive:
                     rews[i] += 1.0
                     info[i]['episode']['r'] = rews[i]
                 else:
@@ -178,6 +194,7 @@ class BattlesnakeEnv(VecEnv):
     def reset(self):
         env_reset(self.ptr)
         return self.getobs(0)
+
 
     def getobs(self, agent_i):
         obsptr = env_obsptr(self.ptr, agent_i)
@@ -193,7 +210,11 @@ class BattlesnakeEnv(VecEnv):
     def set_attr(self, attr_name, value, indices=None):
         pass
 
-    def env_method(self, method_name, *method_args, indices=None, **method_kwargs):
+    def env_method(self,
+                   method_name,
+                   *method_args,
+                   indices=None,
+                   **method_kwargs):
         pass
 
     def seed(self, seed=None):
