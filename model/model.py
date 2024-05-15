@@ -9,6 +9,8 @@ from gym_battlesnake.gymbattlesnake import BattlesnakeEnv
 from a2c_ppo_acktr.algo import PPO
 from a2c_ppo_acktr.storage import RolloutStorage
 from sklearn.base import BaseEstimator
+from matplotlib import pyplot as plt
+from matplotlib import animation
 
 from utils import PredictionPolicy, SnakePolicyBase
 
@@ -225,7 +227,107 @@ class RLAgent:
         plt.show()
 
     def save_policy(self, path="policy.pth"):
-        torch.save(self.policy.state_dict(), path)
+        # Perform checks to ensure the directory exists
+        if os.path.exists(os.path.dirname(path)):
+            if not path.endswith(".pth"):
+                path += ".pth"
+            torch.save(self.policy.state_dict(), path)
+            print("Policy saved to", path)
+        else:
+            print("Directory does not exist, saving to policy.pth")
+            torch.save(self.policy.state_dict(), "policy.pth")
+
+    def obs_to_frame(self, obs):
+        ''' Converts an environment observation into a renderable RGB image '''
+        # First, let's find the game board dimensions from layer 5
+        x_offset, y_offset = 0, 0
+        done = False
+        for x in range(23):
+            if done:
+                break
+            for y in range(23):
+                if obs[0][5][x][y] == 1:
+                    x_offset = x
+                    y_offset = y
+                    done = True
+                    break
+        output = np.zeros((11, 11, 3), dtype=np.uint8)
+
+        # See https://github.com/cbinners/gym-battlesnake/blob/master/gym_battlesnake/src/gamewrapper.cpp#L55 for
+        # layer reference
+        for x in range(23):
+            for y in range(23):
+                # Render snake bodies
+                if obs[0][1][x][y] == 1:
+                    output[x-x_offset][y-y_offset] = 255 - 10*(255 - obs[0][2][x][y])
+                # Render food
+                if obs[0][4][x][y] == 1:
+                    output[x-x_offset][y-y_offset][0] = 255
+                    output[x-x_offset][y-y_offset][1] = 255
+                    output[x-x_offset][y-y_offset][2] = 0
+                # Render snake heads as a red pixel
+                if obs[0][0][x][y] > 0:
+                    # Render teammate as blue pixel
+                    if obs[0][17][x][y] == 1:
+                        output[x-x_offset][y-y_offset][0] = 0
+                        output[x-x_offset][y-y_offset][1] = 0
+                        output[x-x_offset][y-y_offset][2] = 255
+                    else:
+                        output[x-x_offset][y-y_offset][0] = 255
+                        output[x-x_offset][y-y_offset][1] = 0
+                        output[x-x_offset][y-y_offset][2] = 0
+                # Render snake heads
+                if obs[0][6][x][y] == 1:
+                    output[x-x_offset][y-y_offset][0] = 0
+                    output[x-x_offset][y-y_offset][1] = 255
+                    output[x-x_offset][y-y_offset][2] = 0
+        return output
+
+    def init_vid(self, im, video):
+        im.set_data(video[0,:,:,:])
+    
+    def animate(self, im, video, i):
+        im.set_data(video[i,:,:,:])
+        return im
+
+    def save_video(self, filename="video.gif"):
+        # To watch a replay, we need an environment
+        # Important: Make sure to use fixed orientation during visualization
+        playground = BattlesnakeEnv(n_threads=1, n_envs=1, opponents=[self.policy for _ in range(2)], fixed_orientation=True, teammates=[self.policy])
+
+        obs = playground.reset()
+        video = []
+
+        with torch.no_grad():
+            for i in range(300):
+                video.append(self.obs_to_frame(obs))
+                _, action, _, _ = self.policy.act(torch.tensor(obs, dtype=torch.float32).to(self.device), None, None)
+                obs,_,_,_ = playground.step(action.cpu().squeeze())
+        
+        video = np.array(video, dtype=np.uint8)
+
+        # Create a video writer using matplotlib animation
+        fig = plt.figure()
+        im = plt.imshow(video[0])
+        plt.axis('off')
+
+        def updatefig(i):
+            im.set_array(video[i])
+            return im,
+
+        ani = animation.FuncAnimation(fig, updatefig, frames=len(video), blit=True)
+
+        # Save the animation
+        if os.path.exists(os.path.dirname(filename)):
+            if not filename.endswith(".gif"):
+                filename += ".gif"
+            ani.save(filename, writer='Pillow', fps=4)
+            print("Video saved to", filename)
+        else:
+            print("Directory does not exist, saving to video.gif")
+            ani.save("video.gif", writer='Pillow', fps=4)
+
+        plt.close()
 
 class RLEstimator(BaseEstimator):
     def __init__(self, value_loss_coef=0.1, entropy_coef=0.001, max_grad_norm=0.1, clip_param=0.1,
