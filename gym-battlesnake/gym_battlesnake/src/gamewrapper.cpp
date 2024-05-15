@@ -6,11 +6,12 @@
 #include <random>
 #include <utility>
 #include <vector>
+#include <iostream>
 
 #include "gameinstance.h"
 #include "threadpool.h"
 
-#define NUM_LAYERS 17 // 7 layers indicating the number of alive opponents
+#define NUM_LAYERS 18 // 7 layers indicating the number of alive opponents
 #define LAYER_WIDTH 23
 #define LAYER_HEIGHT 23
 #define OBS_SIZE NUM_LAYERS *LAYER_WIDTH *LAYER_HEIGHT
@@ -24,6 +25,7 @@ struct info {
   bool alive_;
   bool ate_;
   bool over_;
+  bool teammate_alive_;
 };
 
 class GameWrapper {
@@ -126,7 +128,24 @@ class GameWrapper {
     return action;
   }
 
-  void writeobs(unsigned model_i, unsigned env_i, unsigned player_id,
+  int get_teammate(unsigned player_id) {
+    // Hardcoded teammate id (fix)
+    switch (player_id)
+    {
+    case 0:
+      return 1;
+    case 1:
+      return 0;
+    case 2:
+      return 3;
+    case 3:
+      return 2;
+    default:
+      return 0;
+    }
+  }
+
+  void writeobs(unsigned model_i, unsigned env_i, unsigned player_id, unsigned teammate_id,
                 State gamestate, unsigned ori) {
     /*
         layer0: snake health on heads {0,...,100}
@@ -140,10 +159,12 @@ class GameWrapper {
         layer8: snake bodies >= us {0,1}
         layer9: snake bodies < us {0,1}
         layer10-16: Alive count
+        layer17: teammate snake bodies {0,1}
     */
     auto &players = std::get<1>(gamestate);
     Tile head, neck;
-    const auto it = players.find(player_id);
+    auto it = players.find(player_id);
+    // const auto it = players.find(player_id);
     if (it != players.end()) {
       head = it->second.body_.front();
       neck = *std::next(it->second.body_.begin(), 1);
@@ -229,9 +250,17 @@ class GameWrapper {
     assign(it->second.body_.front(), 6, 1);
 
     auto alive_count = 0;
-    for (const auto &p : players) {
-      if (!p.second.alive_)
+    for (const auto &p : players) { // This would not let modify
+      if (!p.second.alive_) {
+        if (p.second.id_ == teammate_id) {
+          // Teammate is dead
+          // TODO CHECK IF WORKS
+          if (it != players.end()) {
+              const_cast<Player &>(it->second).setTeammateAlive(false);
+          }
+        }
         continue;
+      }
       alive_count++;
       // Assign health on head
       assign(p.second.body_.front(), 0, p.second.health_);
@@ -252,6 +281,10 @@ class GameWrapper {
           }
         }
         assign(*cit, 1, 1);
+        // Assign teammate snake bodies to layer 17
+        if (p.second.id_ == teammate_id) {
+          assign(*cit, 17, 1);
+        }
         assign(*cit, 2, std::min(++i, static_cast<unsigned>(255)));
         if (p.second.id_ != player_id) {
           if (p.second.body_.size() >= playersize) {
@@ -318,10 +351,11 @@ public:
         gi = std::make_shared<GameInstance>(bwidth, bheight, n_models_,
                                             food_spawn_chance);
         // Write states into observation arrays
-        auto ids = gi->getplayerids();
+        std::vector<unsigned> ids = gi->getplayerids();
         auto state = gi->getstate();
+        auto teammate_id = ids[get_teammate(0)];
         for (unsigned m{0}; m < n_models_; ++m) {
-          writeobs(m, ii, ids[m], state,
+          writeobs(m, ii, ids[m], teammate_id, state,
                    orientation(gi->gameid(), gi->turn(), ids[m], fixed_orientation_));
         }
         info_[ii].health_ = 100;
@@ -332,6 +366,7 @@ public:
         info_[ii].over_ = false;
         info_[ii].alive_count_ = n_models_;
         info_[ii].death_reason_ = DEATH_NONE;
+        info_[ii].teammate_alive_ = true;
       });
     }
     threadpool_.wait();
@@ -360,9 +395,14 @@ public:
         // Step game
         gi->step();
 
-        // Figure out if done
         it = std::get<1>(gi->getstate()).find(player_id);
-        bool done = !(it->second.alive_) || gi->over();
+        
+        // Get teammate
+        auto teammate_id = ids[get_teammate(0)];
+        auto teammate_it = std::get<1>(gi->getstate()).find(teammate_id);
+
+        // Figure out if done
+        bool done = !(it->second.alive_ || teammate_it->second.alive_) || gi->over();
 
         // Count how many players are alive
         unsigned count = 0;
@@ -385,6 +425,7 @@ public:
         info_[ii].over_ = done;
         info_[ii].alive_count_ = count;
         info_[ii].death_reason_ = it->second.death_reason_;
+        info_[ii].teammate_alive_ = teammate_it->second.alive_;
 
         // Reset game if over
         if (done) {
@@ -401,7 +442,7 @@ public:
         }
         // Write states into observation arrays
         for (unsigned m{0}; m < n_models_; ++m) {
-          writeobs(m, ii, ids[m], gi->getstate(),
+          writeobs(m, ii, ids[m], teammate_id, gi->getstate(),
                    orientation(gi->gameid(), gi->turn(), ids[m], fixed_orientation_));
         }
       });
