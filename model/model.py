@@ -55,7 +55,7 @@ class RLAgent:
         self.best_old_policy = create_policy(self.env.observation_space.shape, self.env.action_space, SnakePolicyBase)
         self.teammate_policy = create_policy(self.env.observation_space.shape, self.env.action_space, SnakePolicyBase)
         
-        self.env = BattlesnakeEnv(n_threads=2, n_envs=self.n_envs, opponents=[self.policy for _ in range(2)], device=self.device, teammates=[self.teammate_policy])
+        self.env = BattlesnakeEnv(n_threads=4, n_envs=self.n_envs, opponents=[self.policy for _ in range(2)], device=self.device, teammates=[self.policy])
         obs = self.env.reset()
         self.rollouts.obs[0].copy_(torch.tensor(obs))
 
@@ -377,7 +377,7 @@ class RLEstimator(BaseEstimator):
         self.num_mini_batch = num_mini_batch
         self.eps = eps
         self.lr = lr
-        self.rl_agent = RLAgent(1, 400, 50)
+        self.rl_agent = RLAgent(50, 400, 50)
 
     def fit(self, X, y=None):
         self.rl_agent.reset_env()

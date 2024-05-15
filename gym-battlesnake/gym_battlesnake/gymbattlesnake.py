@@ -88,23 +88,16 @@ class BattlesnakeEnv(VecEnv):
                 dones[i] = True
                 info[i]['episode'] = {}
                 if infoptr[i].alive and infoptr[i].teammate_alive:
-                    print("BOTH ALIVE")
                     rews[i] += 2.0
                     info[i]['episode']['r'] = rews[i]
                 elif infoptr[i].alive or infoptr[i].teammate_alive:
-                    if infoptr[i].alive:
-                        print("only player")
-                    else:
-                        print("only teammate")
                     rews[i] += 1.0
                     info[i]['episode']['r'] = rews[i]
                 else:
-                    print("both dead...")
                     rews[i] -= 1.0
                     info[i]['episode']['r'] = rews[i]
                 info[i]['episode']['l'] = infoptr[i].turn
 
-        print("returning", rews)
         return self.getobs(0), rews, dones, info
 
     def reset(self):
