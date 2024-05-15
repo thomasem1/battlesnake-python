@@ -58,6 +58,13 @@ class RLAgent:
         self.env = BattlesnakeEnv(n_threads=4, n_envs=self.n_envs, opponents=[self.policy for _ in range(2)], device=self.device, teammates=[self.policy])
         obs = self.env.reset()
         self.rollouts.obs[0].copy_(torch.tensor(obs))
+    
+    def load_policy(self, path):
+        if os.path.exists(path):
+            print("Loading policy from", path)
+            self.policy.load_state_dict(torch.load(path))
+        else:
+            print("File does not exist, using randomly initialized policy")
 
     def set_agent(self, value_loss_coef, entropy_coef, max_grad_norm, clip_param, ppo_epoch, num_mini_batch, eps, lr):
         self.value_loss_coef = value_loss_coef

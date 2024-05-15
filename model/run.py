@@ -1,6 +1,8 @@
 import numpy as np
 import json
 import model
+import os
+import argparse
 
 from sklearn.model_selection import GridSearchCV
 
@@ -8,14 +10,14 @@ HYPERPARAM_FILE = "config/best_hyperparameters.json"
 
 def hyperparam_tuning():
     hyperparameters = {
-        'value_loss_coef': [0.25, 0.4, 0.5, 0.6],
-        'entropy_coef': [0.001, 0.005, 0.01, 0.025],
-        'max_grad_norm': [0.1, 0.25, 0.5, 0.75],
-        'clip_param': [0.1, 0.2, 0.3],
-        'ppo_epoch': [3, 4, 5],
-        'num_mini_batch': [16, 32, 64],
+        'value_loss_coef': [0.3, 0.5, 0.6],
+        'entropy_coef': [0.01, 0.025],
+        'max_grad_norm': [0.5],
+        'clip_param': [0.1, 0.2],
+        'ppo_epoch': [4],
+        'num_mini_batch': [32, 64],
         'eps': [1e-6, 1e-5, 1e-4],
-        'lr': [1e-3, 1e-2, 1e-4, 5e-3, 5e-4]
+        'lr': [1e-3, 1e-2, 1e-4]
     }
 
     # hyperparameters = {
@@ -44,7 +46,7 @@ def hyperparam_tuning():
         json.dump(best_params, f)
     print(f"Best hyperparameters saved to {HYPERPARAM_FILE}")
 
-def train_model():
+def train_model(load_policy):
     try:
         with open(HYPERPARAM_FILE, "r") as f:
             best_params = json.load(f)
@@ -65,6 +67,10 @@ def train_model():
     rl_agent = model.RLAgent(50, 400, 50)
     rl_agent.set_agent(best_params.get("value_loss_coef"), best_params.get("entropy_coef"), best_params.get("max_grad_norm"), best_params.get("clip_param"), best_params.get("ppo_epoch"), best_params.get("num_mini_batch"), best_params.get("eps"), best_params.get("lr"))
     
+    if os.path.exists(load_policy):
+        print("-"*10, "Loading policy...", "-"*10)
+        rl_agent.load_policy(load_policy)
+
     print("-"*10, "Training model...", "-"*10)
     rl_agent.train()
     print("-"*10, "Training complete!", "-"*10)
@@ -76,5 +82,11 @@ def train_model():
     print("-"*10, "Run completed!", "-"*10)
 
 if __name__ == "__main__":
-    hyperparam_tuning()
-    train_model()
+    parser = argparse.ArgumentParser(description="Train a snake model")
+    parser.add_argument("--tune", action="store_true", help="Run hyperparameter tuning")
+    parser.add_argument("--load_policy", type=str, default="", help="Load a policy from a file")
+    args = parser.parse_args()
+
+    if args.tune:
+        hyperparam_tuning()
+    train_model(args.load_policy)
