@@ -205,12 +205,41 @@ class RLAgent:
                 if winrate > 0.3:
                     print("Policy winrate is > 30%. Updating prior best model")
                     self.best_old_policy.load_state_dict(self.policy.state_dict())
+                    # Get directory of this file
+                    directory = os.path.dirname(os.path.realpath(__file__))
+                    models_path = os.path.join(directory, "models")
+                    self.save_policy(models_path)
                 else:
                     print("Policy has not learned enough yet... keep training!")
                 print("-" * 80)
 
         self.lengths = lengths
         self.rewards = rewards
+
+    def save_results(self, path="results"):
+        directory = os.path.dirname(os.path.realpath(__file__))
+        path = os.path.join(directory, path)
+        if not os.path.exists(path):
+            print("Path does not exist, saving to current directory")
+            path = ""
+
+        plt.clf()
+        plt.title("Average episode length")
+        plt.ylabel("Length")
+        plt.xlabel("Iteration")
+        plt.plot(self.lengths)
+        name = "lengths_" + time.strftime("%Y%m%d-%H%M%S") + ".png"
+        plt.savefig(os.path.join(path, name))
+
+        plt.clf()
+        plt.title("Average episode reward")
+        plt.ylabel("Reward")
+        plt.xlabel("Iteration")
+        plt.plot(self.rewards)
+        name = "rewards_" + time.strftime("%Y%m%d-%H%M%S") + ".png"
+        plt.savefig(os.path.join(path, name))
+        print("Results saved to", path)
+
 
     def plot_results(self):
         plt.clf()
@@ -226,16 +255,19 @@ class RLAgent:
         plt.plot(self.rewards)
         plt.show()
 
-    def save_policy(self, path="policy.pth"):
+    def save_policy(self, path="models"):
+        directory = os.path.dirname(os.path.realpath(__file__))
+        path = os.path.join(directory, path)
         # Perform checks to ensure the directory exists
+        # Append date to the name
+        name = "policy_" + time.strftime("%Y%m%d-%H%M%S") + ".pth"
         if os.path.exists(os.path.dirname(path)):
-            if not path.endswith(".pth"):
-                path += ".pth"
-            torch.save(self.policy.state_dict(), path)
-            print("Policy saved to", path)
+            filename = os.path.join(path, name)
+            torch.save(self.policy.state_dict(), filename)
+            print("Policy saved to", filename)
         else:
-            print("Directory does not exist, saving to policy.pth")
-            torch.save(self.policy.state_dict(), "policy.pth")
+            print("Directory does not exist, saving to current directory")
+            torch.save(self.policy.state_dict(), name)
 
     def obs_to_frame(self, obs):
         ''' Converts an environment observation into a renderable RGB image '''
@@ -277,7 +309,7 @@ class RLAgent:
                         output[x-x_offset][y-y_offset][1] = 0
                         output[x-x_offset][y-y_offset][2] = 0
                 # Render snake heads
-                if obs[0][6][x][y] == 1:
+                if obs[0][6][x][y] == 1 and obs[0][0][x][y] > 0:
                     output[x-x_offset][y-y_offset][0] = 0
                     output[x-x_offset][y-y_offset][1] = 255
                     output[x-x_offset][y-y_offset][2] = 0
@@ -290,7 +322,9 @@ class RLAgent:
         im.set_data(video[i,:,:,:])
         return im
 
-    def save_video(self, filename="video.gif"):
+    def save_video(self, path="video"):
+        directory = os.path.dirname(os.path.realpath(__file__))
+        path = os.path.join(directory, path)
         # To watch a replay, we need an environment
         # Important: Make sure to use fixed orientation during visualization
         playground = BattlesnakeEnv(n_threads=1, n_envs=1, opponents=[self.policy for _ in range(2)], fixed_orientation=True, teammates=[self.policy])
@@ -318,14 +352,15 @@ class RLAgent:
         ani = animation.FuncAnimation(fig, updatefig, frames=len(video), blit=True)
 
         # Save the animation
-        if os.path.exists(os.path.dirname(filename)):
-            if not filename.endswith(".gif"):
-                filename += ".gif"
+        # Append date to the filename
+        name = "video_" + time.strftime("%Y%m%d-%H%M%S") + ".gif"
+        if os.path.exists(os.path.dirname(path)):
+            filename = os.path.join(path, name)
             ani.save(filename, writer='Pillow', fps=4)
             print("Video saved to", filename)
         else:
-            print("Directory does not exist, saving to video.gif")
-            ani.save("video.gif", writer='Pillow', fps=4)
+            print("Directory does not exist, saving to current directory")
+            ani.save(name, writer='Pillow', fps=4)
 
         plt.close()
 

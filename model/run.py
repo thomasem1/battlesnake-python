@@ -19,14 +19,14 @@ def hyperparam_tuning():
     # }
 
     hyperparameters = {
-        'value_loss_coef': [0.1],
-        'entropy_coef': [0.1],
-        'max_grad_norm': [1.0],
-        'clip_param': [0.3],
-        'ppo_epoch': [5],
+        'value_loss_coef': [0.5],
+        'entropy_coef': [0.01],
+        'max_grad_norm': [0.5],
+        'clip_param': [0.2],
+        'ppo_epoch': [4],
         'num_mini_batch': [32],
-        'eps': [1e-4],
-        'lr': [0.01]
+        'eps': [1e-5],
+        'lr': [1e-3]
     }
 
     rl_estimator = model.RLEstimator()
@@ -49,27 +49,29 @@ def train_model():
         with open(HYPERPARAM_FILE, "r") as f:
             best_params = json.load(f)
     except FileNotFoundError:
+        print("No hyperparameters file found, selecting default hyperparameters...")
         best_params = {
-            'value_loss_coef': 0.1,
-            'entropy_coef': 0.1,
-            'max_grad_norm': 1.0,
-            'clip_param': 0.3,
-            'ppo_epoch': 5,
+            'value_loss_coef': 0.5,
+            'entropy_coef': 0.01,
+            'max_grad_norm': 0.5,
+            'clip_param': 0.2,
+            'ppo_epoch': 4,
             'num_mini_batch': 32,
-            'eps': 1e-4,
-            'lr': 0.01
+            'eps': 1e-5,
+            'lr': 1e-3
         }
     print("Loaded best hyperparameters:", best_params)
 
-    rl_agent = model.RLAgent(4, 400, 5)
+    rl_agent = model.RLAgent(50, 400, 10)
     rl_agent.set_agent(best_params.get("value_loss_coef"), best_params.get("entropy_coef"), best_params.get("max_grad_norm"), best_params.get("clip_param"), best_params.get("ppo_epoch"), best_params.get("num_mini_batch"), best_params.get("eps"), best_params.get("lr"))
     
     print("-"*10, "Training model...", "-"*10)
     rl_agent.train()
     print("-"*10, "Training complete!", "-"*10)
 
-    rl_agent.save_policy("models/rl_policy.pth")
-    rl_agent.save_video("videos/rl_policy.gif")
+    rl_agent.save_results("results")
+    rl_agent.save_policy("models")
+    rl_agent.save_video("videos")
 
     print("-"*10, "Run completed!", "-"*10)
 
