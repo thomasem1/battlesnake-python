@@ -73,14 +73,12 @@ class ParallelBattlesnakeEnv(VecEnv):
         acts = acts.view(self.n_opponents, self.n_envs).cpu().detach().numpy().astype(np.uint8)
         for i in range(self.n_opponents):
             np.copyto(self.getact(i+1), acts[i].flatten())
-            
         # Step game
         env_step(self.ptr)
 
     def step_wait(self):
-
         info = [{} for _ in range(self.n_envs)]
-        dones = np.asarray([ False for _ in range(self.n_envs) ])
+        dones = np.asarray([False for _ in range(self.n_envs)])
         rews = np.zeros((self.n_envs))
 
         infoptr = env_infoptr(self.ptr)
@@ -102,7 +100,6 @@ class ParallelBattlesnakeEnv(VecEnv):
     def reset(self):
         env_reset(self.ptr)
         return self.getobs(0)
-
 
     def getobs(self, agent_i):
         obsptr = env_obsptr(self.ptr, agent_i)
@@ -194,7 +191,6 @@ class BattlesnakeEnv(VecEnv):
     def reset(self):
         env_reset(self.ptr)
         return self.getobs(0)
-
 
     def getobs(self, agent_i):
         obsptr = env_obsptr(self.ptr, agent_i)
