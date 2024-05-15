@@ -53,8 +53,9 @@ class RLAgent:
 
         self.policy = create_policy(self.env.observation_space.shape, self.env.action_space, SnakePolicyBase)
         self.best_old_policy = create_policy(self.env.observation_space.shape, self.env.action_space, SnakePolicyBase)
+        self.teammate_policy = create_policy(self.env.observation_space.shape, self.env.action_space, SnakePolicyBase)
         
-        self.env = BattlesnakeEnv(n_threads=2, n_envs=self.n_envs, opponents=[self.policy for _ in range(2)], device=self.device, teammates=[self.policy])
+        self.env = BattlesnakeEnv(n_threads=2, n_envs=self.n_envs, opponents=[self.policy for _ in range(2)], device=self.device, teammates=[self.teammate_policy])
         obs = self.env.reset()
         self.rollouts.obs[0].copy_(torch.tensor(obs))
 
@@ -82,7 +83,7 @@ class RLAgent:
     # Let's define a method to check our performance against an older policy
     # Determines an unbiased winrate check
     def check_performance(self, n_opponents=2, n_envs=1000, steps=1500):
-        test_env = BattlesnakeEnv(n_threads=os.cpu_count(), n_envs=n_envs, opponents=[self.best_old_policy for _ in range(n_opponents)], device=self.device, teammates=[self.policy])
+        test_env = BattlesnakeEnv(n_threads=os.cpu_count(), n_envs=n_envs, opponents=[self.best_old_policy for _ in range(n_opponents)], device=self.device, teammates=[self.teammate_policy])
         obs = test_env.reset()
         wins = 0
         losses = 0
@@ -128,6 +129,7 @@ class RLAgent:
         # Send our network and storage to the gpu
         self.policy.to(self.device)
         self.best_old_policy.to(self.device)
+        self.teammate_policy.to(self.device)
         self.rollouts.to(self.device)
 
         # Record mean values to plot at the end
@@ -185,6 +187,8 @@ class RLAgent:
             lengths.append(np.mean(episode_lengths))
             rewards.append(np.mean(episode_rewards))
             value_losses.append(value_loss)
+
+            self.teammate_policy.load_state_dict(self.policy.state_dict())
             
             # Every 5 iterations, we'll print out the episode metrics
             if (j+1) % 5 == 0:
@@ -198,12 +202,10 @@ class RLAgent:
                 print(f"Max Length: {np.max(episode_lengths)}")
                 print(f"Min Length: {np.min(episode_lengths)}")
 
-                # If our policy wins more than 30% of the games against the prior
-                # best opponent, update the prior best.
-                # Expected outcome for equal strength players is 25% winrate in a 4 player
-                # match.
-                if winrate > 0.3:
-                    print("Policy winrate is > 30%. Updating prior best model")
+                # If our policy wins more than 60% of the games against the prior best opponent, update the prior best.
+                # Expected outcome for equal strength players is 50% winrate in a 2v2 player match.
+                if winrate > 0.6:
+                    print("Policy winrate is > 60%. Updating prior best model")
                     self.best_old_policy.load_state_dict(self.policy.state_dict())
                     # Get directory of this file
                     directory = os.path.dirname(os.path.realpath(__file__))

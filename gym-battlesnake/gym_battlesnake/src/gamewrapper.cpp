@@ -425,7 +425,6 @@ public:
         info_[ii].over_ = done;
         info_[ii].alive_count_ = count;
         info_[ii].death_reason_ = it->second.death_reason_;
-        info_[ii].teammate_alive_ = true;
         info_[ii].teammate_alive_ = teammate_it->second.alive_;
 
         // Reset game if over
