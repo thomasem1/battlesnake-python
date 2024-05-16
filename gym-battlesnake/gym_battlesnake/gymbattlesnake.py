@@ -16,7 +16,7 @@ def wrap_function(lib, funcname, restype, argtypes):
 
 class info(ctypes.Structure):
     _fields_ = [('health', ctypes.c_uint), ('length', ctypes.c_uint), ('turn', ctypes.c_uint), ('alive_count', ctypes.c_uint), ('death_reason', ctypes.c_uint),
-        ('alive', ctypes.c_bool), ('teammate_alive', ctypes.c_bool), ('ate', ctypes.c_bool), ('over', ctypes.c_bool)]
+        ('alive', ctypes.c_bool), ('ate', ctypes.c_bool), ('over', ctypes.c_bool), ('teammate_alive', ctypes.c_bool)]
 
 gamelib = None
 try:
@@ -87,10 +87,10 @@ class BattlesnakeEnv(VecEnv):
             if infoptr[i].over:
                 dones[i] = True
                 info[i]['episode'] = {}
-                if infoptr[i].alive and infoptr[i].teammate_alive:
-                    rews[i] += 2.0
-                    info[i]['episode']['r'] = rews[i]
-                elif infoptr[i].alive or infoptr[i].teammate_alive:
+                # if infoptr[i].alive and infoptr[i].teammate_alive:
+                #     rews[i] += 2.0
+                #     info[i]['episode']['r'] = rews[i]
+                if infoptr[i].alive or infoptr[i].teammate_alive:
                     rews[i] += 1.0
                     info[i]['episode']['r'] = rews[i]
                 else:
