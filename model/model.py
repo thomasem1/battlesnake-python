@@ -4,6 +4,7 @@ import os
 import time
 import torch
 import matplotlib.pyplot as plt
+import random
 
 from gym_battlesnake.gymbattlesnake import BattlesnakeEnv
 from a2c_ppo_acktr.algo import PPO
@@ -39,7 +40,8 @@ class RLAgent:
         self.rewards = None
         self.agent = None
 
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')        
+        self.device = torch.device('cuda')        
+        print(self.device)
         self.reset_env()
     
     def reset_env(self):
@@ -53,9 +55,11 @@ class RLAgent:
 
         self.policy = create_policy(self.env.observation_space.shape, self.env.action_space, SnakePolicyBase)
         self.best_old_policy = create_policy(self.env.observation_space.shape, self.env.action_space, SnakePolicyBase)
-        self.teammate_policy = create_policy(self.env.observation_space.shape, self.env.action_space, SnakePolicyBase)
-        
-        self.env = BattlesnakeEnv(n_threads=4, n_envs=self.n_envs, opponents=[self.policy for _ in range(2)], device=self.device, teammates=[self.policy])
+        self.policy.to(self.device)
+        self.best_old_policy.to(self.device)
+        self.rollouts.to(self.device)
+        print(self.device)
+        self.env = BattlesnakeEnv(n_threads=8, n_envs=self.n_envs, opponents=[self.policy for _ in range(2)], device=self.device, teammates=[self.policy])
         obs = self.env.reset()
         self.rollouts.obs[0].copy_(torch.tensor(obs))
     
@@ -63,6 +67,7 @@ class RLAgent:
         if os.path.exists(path):
             print("Loading policy from", path)
             self.policy.load_state_dict(torch.load(path))
+            self.best_old_policy.load_state_dict(torch.load(path))
         else:
             print("File does not exist, using randomly initialized policy")
 
@@ -90,7 +95,7 @@ class RLAgent:
     # Let's define a method to check our performance against an older policy
     # Determines an unbiased winrate check
     def check_performance(self, n_opponents=2, n_envs=1000, steps=1500):
-        test_env = BattlesnakeEnv(n_threads=os.cpu_count(), n_envs=n_envs, opponents=[self.best_old_policy for _ in range(n_opponents)], device=self.device, teammates=[self.teammate_policy])
+        test_env = BattlesnakeEnv(n_threads=os.cpu_count(), n_envs=n_envs, opponents=[self.best_old_policy for _ in range(n_opponents)], device=self.device, teammates=[self.policy])
         obs = test_env.reset()
         wins = 0
         losses = 0
@@ -133,11 +138,12 @@ class RLAgent:
         return self.lengths[-1] if self.lengths else 0
 
     def train(self):
+        print(self.device)
         # Send our network and storage to the gpu
         self.policy.to(self.device)
         self.best_old_policy.to(self.device)
-        self.teammate_policy.to(self.device)
         self.rollouts.to(self.device)
+        prior_best_models = [self.best_old_policy]  # Initialize the list with the first best model
 
         # Record mean values to plot at the end
         rewards = []
@@ -151,6 +157,16 @@ class RLAgent:
             # Set
             self.policy.eval()
             print(f"Iteration {j+1}: Generating rollouts")
+            # Determine the opponents for this iteration
+            if random.random() < 0.8:
+                opponents = [self.policy for _ in range(2)]  # Use the current best model 80% of the time
+            else:
+                prior_best_opponent = random.choice(prior_best_models)  # Use a prior best model 20% of the time
+                opponents = [prior_best_opponent for _ in range(2)]
+            # Create a new environment instance with the selected opponents
+            self.env = BattlesnakeEnv(n_threads=8, n_envs=self.n_envs, opponents=opponents, device=self.device, teammates=[self.policy])
+            obs = self.env.reset()
+            self.rollouts.obs[0].copy_(torch.tensor(obs))
             for step in range(self.n_steps):
                 with torch.no_grad():
                     value, action, action_log_prob, recurrent_hidden_states = self.policy.act(self.rollouts.obs[step],
@@ -194,11 +210,9 @@ class RLAgent:
             lengths.append(np.mean(episode_lengths))
             rewards.append(np.mean(episode_rewards))
             value_losses.append(value_loss)
-
-            self.teammate_policy.load_state_dict(self.policy.state_dict())
             
-            # Every 5 iterations, we'll print out the episode metrics
-            if (j+1) % 5 == 0:
+            # Every 20 iterations, we'll print out the episode metrics
+            if (j+1) % 20 == 0:
                 print("\n")
                 print("=" * 80)
                 print("Iteration", j+1, "Results")
@@ -209,10 +223,11 @@ class RLAgent:
                 print(f"Max Length: {np.max(episode_lengths)}")
                 print(f"Min Length: {np.min(episode_lengths)}")
 
-                # If our policy wins more than 60% of the games against the prior best opponent, update the prior best.
+                # If our policy wins more than 51% of the games against the prior best opponent, update the prior best.
                 # Expected outcome for equal strength players is 50% winrate in a 2v2 player match.
-                if winrate > 0.6:
-                    print("Policy winrate is > 60%. Updating prior best model")
+                if winrate > 0.51:
+                    print("Policy winrate is > 51%. Updating prior best model")
+                    prior_best_models.append(self.policy)  # Add the current best model to the list of prior best models
                     self.best_old_policy.load_state_dict(self.policy.state_dict())
                     # Get directory of this file
                     directory = os.path.dirname(os.path.realpath(__file__))

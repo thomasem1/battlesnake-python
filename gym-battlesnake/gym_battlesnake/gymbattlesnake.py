@@ -67,12 +67,12 @@ class BattlesnakeEnv(VecEnv):
             # Teammates
             for j in range(1, self.n_teammates + 1):
                 obss = torch.tensor(self.getobs(j), dtype=torch.float32).to(self.device)
-                acts, _ = self.teammates[j-1].predict(obss, deterministic=True)
+                acts, _ = self.teammates[j-1].predict(obss, deterministic=True, device=self.device)
                 np.copyto(self.getact(j), acts.detach().cpu().numpy().flatten().astype(np.uint8))
             # Opponents
             for i in range(self.n_teammates + 1, self.n_teammates + self.n_opponents+1):
                 obss = torch.tensor(self.getobs(i), dtype=torch.float32).to(self.device)
-                acts,_ = self.opponents[i - self.n_teammates - 1].predict(obss, deterministic=True)
+                acts,_ = self.opponents[i - self.n_teammates - 1].predict(obss, deterministic=True, device=self.device)
                 np.copyto(self.getact(i), acts.detach().cpu().numpy().flatten().astype(np.uint8))
         # Step game
         env_step(self.ptr)

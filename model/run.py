@@ -64,7 +64,7 @@ def train_model(load_policy):
         }
     print("Loaded best hyperparameters:", best_params)
 
-    rl_agent = model.RLAgent(50, 400, 50)
+    rl_agent = model.RLAgent(200, 600, 1000)
     rl_agent.set_agent(best_params.get("value_loss_coef"), best_params.get("entropy_coef"), best_params.get("max_grad_norm"), best_params.get("clip_param"), best_params.get("ppo_epoch"), best_params.get("num_mini_batch"), best_params.get("eps"), best_params.get("lr"))
     
     if os.path.exists(load_policy):
@@ -87,6 +87,6 @@ if __name__ == "__main__":
     parser.add_argument("--load_policy", type=str, default="", help="Load a policy from a file")
     args = parser.parse_args()
 
-    if args.tune:
-        hyperparam_tuning()
+    # if args.tune:
+    #     hyperparam_tuning()
     train_model(args.load_policy)
