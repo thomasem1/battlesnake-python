@@ -87,10 +87,10 @@ class BattlesnakeEnv(VecEnv):
             if infoptr[i].over:
                 dones[i] = True
                 info[i]['episode'] = {}
-                # if infoptr[i].alive and infoptr[i].teammate_alive:
-                #     rews[i] += 2.0
-                #     info[i]['episode']['r'] = rews[i]
-                if infoptr[i].alive or infoptr[i].teammate_alive:
+                if infoptr[i].alive and infoptr[i].teammate_alive:
+                    rews[i] += 2.0
+                    info[i]['episode']['r'] = rews[i]
+                elif infoptr[i].alive or infoptr[i].teammate_alive:
                     rews[i] += 1.0
                     info[i]['episode']['r'] = rews[i]
                 else:
