@@ -252,13 +252,13 @@ class GameWrapper {
     auto alive_count = 0;
     for (const auto &p : players) { // This would not let modify
       if (!p.second.alive_) {
-        if (p.second.id_ == teammate_id) {
-          // Teammate is dead
-          // TODO CHECK IF WORKS
-          if (it != players.end()) {
-              const_cast<Player &>(it->second).setTeammateAlive(false);
-          }
-        }
+        // if (p.second.id_ == teammate_id) {
+        //   // Teammate is dead
+        //   // TODO CHECK IF WORKS
+        //   if (it != players.end()) {
+        //       const_cast<Player &>(it->second).setTeammateAlive(false);
+        //   }
+        // }
         continue;
       }
       alive_count++;
@@ -281,11 +281,13 @@ class GameWrapper {
           }
         }
         assign(*cit, 1, 1);
-        // Assign teammate snake bodies to layer 17
+        
+        assign(*cit, 2, std::min(++i, static_cast<unsigned>(255)));
+        // Teammate snake bodies
         if (p.second.id_ == teammate_id) {
           assign(*cit, 17, 1);
         }
-        assign(*cit, 2, std::min(++i, static_cast<unsigned>(255)));
+
         if (p.second.id_ != player_id) {
           if (p.second.body_.size() >= playersize) {
             assign(*cit, 8, 1 + p.second.body_.size() - playersize); // Store the difference
