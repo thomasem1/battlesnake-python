@@ -4,6 +4,8 @@ import torch.nn.functional as F
 
 from a2c_ppo_acktr.model import Policy, NNBase
 
+GROUP_SHOUT = "GROUP 4:20"
+
 # From https://github.com/fastai/fastai2/blob/master/fastai2/vision/models/xresnet.py
 def init_cnn(m):
     if getattr(m, 'bias', None) is not None: nn.init.constant_(m.bias, 0)
