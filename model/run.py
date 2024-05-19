@@ -44,7 +44,7 @@ def hyperparam_tuning():
 
     with open(HYPERPARAM_FILE, "w") as f:
         json.dump(best_params, f)
-    print(f"Best hyperparameters saved to {HYPERPARAM_FILE}")
+    print("Best hyperparameters saved to", HYPERPARAM_FILE)
 
 def train_model(load_policy):
     try:
@@ -64,7 +64,7 @@ def train_model(load_policy):
         }
     print("Loaded best hyperparameters:", best_params)
 
-    rl_agent = model.RLAgent(200, 600, 1000)
+    rl_agent = model.RLAgent(200, 600, 2000)
     rl_agent.set_agent(best_params.get("value_loss_coef"), best_params.get("entropy_coef"), best_params.get("max_grad_norm"), best_params.get("clip_param"), best_params.get("ppo_epoch"), best_params.get("num_mini_batch"), best_params.get("eps"), best_params.get("lr"))
     
     if os.path.exists(load_policy):

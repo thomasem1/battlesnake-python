@@ -144,6 +144,7 @@ class RLAgent:
         self.best_old_policy.to(self.device)
         self.rollouts.to(self.device)
         prior_best_models = [self.best_old_policy]  # Initialize the list with the first best model
+        self.save_policy("test")
 
         # Record mean values to plot at the end
         rewards = []
@@ -225,13 +226,11 @@ class RLAgent:
 
                 # If our policy wins more than 51% of the games against the prior best opponent, update the prior best.
                 # Expected outcome for equal strength players is 50% winrate in a 2v2 player match.
-                if winrate > 0.51:
+                if winrate > 0.60:
                     print("Policy winrate is > 51%. Updating prior best model")
                     prior_best_models.append(self.policy)  # Add the current best model to the list of prior best models
                     self.best_old_policy.load_state_dict(self.policy.state_dict())
-                    # Get directory of this file
-                    directory = os.path.dirname(os.path.realpath(__file__))
-                    models_path = os.path.join(directory, "models")
+                    models_path = "models"
                     self.save_policy(models_path)
                 else:
                     print("Policy has not learned enough yet... keep training!")
@@ -351,7 +350,7 @@ class RLAgent:
         path = os.path.join(directory, path)
         # To watch a replay, we need an environment
         # Important: Make sure to use fixed orientation during visualization
-        playground = BattlesnakeEnv(n_threads=1, n_envs=1, opponents=[self.policy for _ in range(2)], fixed_orientation=True, teammates=[self.policy])
+        playground = BattlesnakeEnv(n_threads=1, n_envs=1, opponents=[self.policy for _ in range(2)], device=self.decive, fixed_orientation=True, teammates=[self.policy])
 
         obs = playground.reset()
         video = []
