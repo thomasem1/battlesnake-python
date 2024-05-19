@@ -2,10 +2,12 @@
 import os
 import torch
 
-from utils import PredictionPolicy, SnakePolicyBase
+from .utils import PredictionPolicy, SnakePolicyBase
+
+from gym import spaces
 
 OBSERVATION_SPACE = (18, 23, 23)
-ACTION_SPACE = 4
+ACTION_SPACE = spaces.Discrete(4)
 
 def create_policy(obs_space, act_space, base):
     """ Returns a wrapped policy for use in the gym """

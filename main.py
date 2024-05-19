@@ -16,7 +16,7 @@ def info() -> typing.Dict:
 
     return {
         "apiversion": "1",
-        "author": "thomasem1",
+        "author": "thomasKarloKissing",
         "color": "#499B4A",
         "head": "gamer",
         "tail": "nr-booster",
@@ -26,7 +26,7 @@ def info() -> typing.Dict:
 # start is called when your Battlesnake begins a game
 def start(game_state: typing.Dict):
     print("GAME START")
-    rl_agent.load_policy("model/models/rl_policy.pth")
+    rl_agent.load_policy("model/models/latest.pth")
 
 
 # end is called when your Battlesnake finishes a game
@@ -250,4 +250,4 @@ def move(game_state: typing.Dict) -> typing.Dict:
 if __name__ == "__main__":
     from server import run_server
 
-    run_server({"info": info, "start": start, "move": move, "end": end})
+    run_server({"info": info, "start": start, "move": move_policy, "end": end})
