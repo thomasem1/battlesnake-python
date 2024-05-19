@@ -239,14 +239,6 @@ class RLAgent:
         self.lengths = lengths
         self.rewards = rewards
 
-    def use_policy(self, obs):
-        self.policy.eval()
-        with torch.no_grad():
-            value, action, _, _ = self.policy.act(
-                obs, None, None
-            )
-        return action.item()
-
     def save_results(self, path="results"):
         directory = os.path.dirname(os.path.realpath(__file__))
         path = os.path.join(directory, path)

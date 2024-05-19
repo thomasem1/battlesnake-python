@@ -2,11 +2,11 @@ import random
 import typing
 import torch
 
-from model.model import RLAgent
+from model.policy import PolicyAgent
 
 GROUP_SHOUT = "GROUP 4:20"
 
-rl_agent = RLAgent()
+rl_agent = PolicyAgent()
 
 # info is called when you create your Battlesnake on play.battlesnake.com
 # and controls your Battlesnake's appearance
