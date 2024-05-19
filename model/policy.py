@@ -87,7 +87,7 @@ def get_observation(game_state: typing.Dict):
         
         # Layer 3: snake length >= player
         if snake['id'] != me['id']:
-            observation[0, 3, snake_length, snake['head']['x'], snake['head']['y']] = 1 if snake_length >= my_length else 0
+            observation[0, 3, snake['head']['x'], snake['head']['y']] = 1 if snake_length >= my_length else 0
     
     # Layer 4: food
     for food_item in food:

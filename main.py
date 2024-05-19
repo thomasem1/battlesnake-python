@@ -32,6 +32,95 @@ def start(game_state: typing.Dict):
 def end(game_state: typing.Dict):
     print("GAME OVER\n")
 
+def safe_policy_move(game_state: typing.Dict) -> typing.Dict:
+    is_move_safe = {"up": True, "down": True, "left": True, "right": True}
+
+    # We've included code to prevent your Battlesnake from moving backwards
+    my_head = game_state["you"]["body"][0]  # Coordinates of your head
+    my_neck = game_state["you"]["body"][1]  # Coordinates of your "neck"
+
+    if my_neck["x"] < my_head["x"]:  # Neck is left of head, don't move left
+        is_move_safe["left"] = False
+
+    elif my_neck["x"] > my_head["x"]:  # Neck is right of head, don't move right
+        is_move_safe["right"] = False
+
+    elif my_neck["y"] < my_head["y"]:  # Neck is below head, don't move down
+        is_move_safe["down"] = False
+
+    elif my_neck["y"] > my_head["y"]:  # Neck is above head, don't move up
+        is_move_safe["up"] = False
+
+    # Step 1 - Prevent your Battlesnake from moving out of bounds
+    board_width = game_state['board']['width']
+    board_height = game_state['board']['height']
+
+    if my_head["x"] == 0:
+        is_move_safe["left"] = False
+    elif my_head["x"] == board_width - 1:
+        is_move_safe["right"] = False
+    if my_head["y"] == 0:
+        is_move_safe["down"] = False
+    elif my_head["y"] == board_height - 1:
+        is_move_safe["up"] = False
+
+    # Step 2 - Prevent your Battlesnake from colliding with itself
+    my_body = game_state['you']['body']
+    for i in range(1, len(my_body)):
+        if my_body[i] == my_head:
+            continue
+        if my_body[i]["x"] == my_head["x"] - 1 and my_body[i]["y"] == my_head["y"]:
+            is_move_safe["left"] = False
+        elif my_body[i]["x"] == my_head["x"] + 1 and my_body[i]["y"] == my_head["y"]:
+            is_move_safe["right"] = False
+        elif my_body[i]["y"] == my_head["y"] - 1 and my_body[i]["x"] == my_head["x"]:
+            is_move_safe["down"] = False
+        elif my_body[i]["y"] == my_head["y"] + 1 and my_body[i]["x"] == my_head["x"]:
+            is_move_safe["up"] = False
+
+    # Step 3 - Prevent your Battlesnake from colliding with other Battlesnakes
+    opponents = game_state['board']['snakes']
+    for opponent in opponents:
+        for body_part in opponent['body']:
+            if body_part == my_head:
+                continue
+            if body_part["x"] == my_head["x"] - 1 and body_part["y"] == my_head["y"]:
+                is_move_safe["left"] = False
+            elif body_part["x"] == my_head["x"] + 1 and body_part["y"] == my_head["y"]:
+                is_move_safe["right"] = False
+            elif body_part["y"] == my_head["y"] - 1 and body_part["x"] == my_head["x"]:
+                is_move_safe["down"] = False
+            elif body_part["y"] == my_head["y"] + 1 and body_part["x"] == my_head["x"]:
+                is_move_safe["up"] = False
+
+    # Are there any safe moves left?
+    safe_moves = []
+    for move, isSafe in is_move_safe.items():
+        if isSafe:
+            safe_moves.append(move)
+
+    # Calculates state observation
+    observation = get_observation(game_state)
+
+    # Use RL agent to get action
+    action = rl_agent.use_policy(observation)
+    
+    # Map action to direction
+    if action == 0:
+        next_move = "up"
+    elif action == 1:
+        next_move = "down"
+    elif action == 2:
+        next_move = "left"
+    else:
+        next_move = "right"
+    
+    if next_move not in safe_moves:
+        next_move = random.choice(safe_moves)
+
+    print(f"MOVE {game_state['turn']}: {next_move}")
+    return {"move": next_move, "shout": GROUP_SHOUT}
+
 def move_policy(game_state: typing.Dict) -> typing.Dict:
     """ Use RL agent to get next move """
 
@@ -159,4 +248,4 @@ def move(game_state: typing.Dict) -> typing.Dict:
 if __name__ == "__main__":
     from server import run_server
 
-    run_server({"info": info, "start": start, "move": move_policy, "end": end})
+    run_server({"info": info, "start": start, "move": safe_policy_move, "end": end})
